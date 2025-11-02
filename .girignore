@@ -1,0 +1,30 @@
+# ===============================
+# 🧠 EDUAI-AI Ignore Rules
+# ===============================
+
+# Env file
+.env
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environment
+.venv/
+env/
+venv/
+
+# AI-generated folders
+/answers/
+/lkpd_outputs/
+/exports/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Editor / IDE configs
+.vscode/
+.idea/
