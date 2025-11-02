@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>SARI AI - Guru</title>
+    <link rel="stylesheet" href="/assets/style.css" />
+</head>
+<body>
+    <div class="navbar">
+        <div><h1>SARI AI</h1></div>
+        <div class="user">Guru Biologi</div>
+    </div>
+
+    <div style="display: flex;">
+        <div class="sidebar">
+            <h3>Menu</h3>
+            <ul>
+                <li class="active" onclick="showTab('create')">Buat LKPD</li>
+                <li onclick="showTab('monitor')">Pantau Jawaban</li>
+                <li onclick="showTab('list')">Daftar LKPD</li>
+            </ul>
+        </div>
+
+        <div class="main-content">
+            <!-- BUAT LKPD -->
+            <div id="create" class="tab">
+                <div class="card">
+                    <h3>Buat LKPD Baru</h3>
+                    <div class="form-group">
+                        <label>Tema</label>
+                        <input type="text" id="theme" placeholder="Contoh: Fotosintesis" />
+                    </div>
+                    <div class="form-group">
+                        <label>Tingkat</label>
+                        <select id="level">
+                            <option value="mudah">Mudah</option>
+                            <option value="sedang" selected>Sedang</option>
+                            <option value="sulit">Sulit</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" onclick="generate()">Generate AI</button>
+                    <div id="result"></div>
+                </div>
+            </div>
+
+            <!-- PANTAU -->
+            <div id="monitor" class="tab" style="display:none;">
+                <div class="card">
+                    <h3>Pantau Jawaban</h3>
+                    <div class="form-group">
+                        <input type="text" id="rekap-id" placeholder="Masukkan ID LKPD" />
+                    </div>
+                    <button class="btn btn-success" onclick="loadRekap()">Lihat Rekap</button>
+                    <div id="rekap-table"></div>
+                    <div class="actions" id="export-buttons" style="display:none; margin-top:1rem;">
+                        <button class="btn btn-success" onclick="downloadCSV()">Download CSV</button>
+                        <button class="btn btn-primary" onclick="downloadXLSX()">Download Excel</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DAFTAR LKPD -->
+            <div id="list" class="tab" style="display:none;">
+                <div class="card">
+                    <h3>Daftar LKPD</h3>
+                    <div id="lkpd-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.style.display = 'none');
+            document.getElementById(tab).style.display = 'block';
+            document.querySelectorAll('.sidebar li').forEach(li => li.classList.remove('active'));
+            event.target.classList.add('active');
+            if (tab === 'list') loadList();
+        }
+
+        async function generate() {
+            const theme = document.getElementById('theme').value;
+            const level = document.getElementById('level').value;
+            if (!theme) return alert("Tema wajib!");
+            const res = await fetch('/api/generate', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({theme, level})
+            });
+            const data = await res.json();
+            document.getElementById('result').innerHTML = `
+                <div class="alert success">
+                    ID: <code>${data.id}</code>
+                    <button class="btn btn-success" onclick="copy('${data.id}')">Copy</button>
+                    <button class="btn btn-primary" onclick="openStudent('${data.id}')">Lihat</button>
+                </div>`;
+        }
+
+        function copy(id) { navigator.clipboard.writeText(id); alert("Tercopy!"); }
+        function openStudent(id) { window.open(`/student.html?id=${id}`, '_blank'); }
+
+        async function loadRekap() {
+            const id = document.getElementById('rekap-id').value;
+            if (!id) return alert("Masukkan ID!");
+            const res = await fetch(`/api/answers/${id}`);
+            const rekap = await res.json();
+            let html = `<table class="table"><tr><th>Nama</th><th>Rata-rata</th><th>Status</th><th>Jml Soal</th></tr>`;
+            rekap.forEach(r => {
+                const statusClass = r.status === 'Tinggi' ? 'status-tinggi' : r.status === 'Cukup' ? 'status-cukup' : 'status-bimbingan';
+                html += `<tr><td>${r.name}</td><td>${r.avg}</td><td class="${statusClass}">${r.status}</td><td>${r.total_questions}</td></tr>`;
+            });
+            html += `</table>`;
+            document.getElementById('rekap-table').innerHTML = html;
+            document.getElementById('export-buttons').style.display = 'block';
+            window.currentId = id;
+        }
+
+        function downloadCSV() {
+            if (!window.currentId) return alert("Lihat rekap dulu!");
+            window.location = `/api/export/${window.currentId}`;
+        }
+
+        function downloadXLSX() {
+            if (!window.currentId) return alert("Lihat rekap dulu!");
+            window.location = `/api/export-xlsx/${window.currentId}`;
+        }
+
+        async function loadList() {
+            const res = await fetch('/api/all-ids');
+            const data = await res.json();
+            let html = '';
+            data.ids.forEach(id => {
+                html += `<div class="card"><strong>ID: ${id}</strong> <button class="btn btn-primary" onclick="openStudent('${id}')">Lihat</button></div>`;
+            });
+            document.getElementById('lkpd-list').innerHTML = html || '<p>Belum ada LKPD.</p>';
+        }
+    </script>
+</body>
+</html>

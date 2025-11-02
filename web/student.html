@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>SARI AI - Siswa</title>
+    <link rel="stylesheet" href="/assets/style.css" />
+</head>
+<body>
+    <!-- NAVBAR -->
+    <div class="navbar">
+        <h1>LKPD Siswa</h1>
+        <div class="user">Masuk sebagai Siswa</div>
+    </div>
+
+    <div class="main-content" style="margin-left: 0; padding: 2rem;">
+        <!-- FORM MASUK -->
+        <div class="card" id="form-section">
+            <h3>Masukkan ID LKPD</h3>
+            <div class="form-group">
+                <input type="text" id="lkpd-id" placeholder="Contoh: abc123" />
+            </div>
+            <div class="form-group">
+                <input type="text" id="nama" placeholder="Nama Lengkap" />
+            </div>
+            <button class="btn btn-primary" onclick="loadLKPD()">Mulai Mengerjakan</button>
+        </div>
+
+        <!-- LKPD CONTENT -->
+        <div id="lkpd-content" style="display:none;">
+            <div class="card">
+                <h2 id="judul-lkpd"></h2>
+                <p><strong>Tema:</strong> <span id="tema"></span> | <strong>Tingkat:</strong> <span id="tingkat"></span></p>
+                <hr>
+                <form id="jawaban-form"></form>
+                <div class="actions" style="margin-top: 1.5rem;">
+                    <button class="btn btn-success" onclick="submitJawaban()">Kirim Jawaban</button>
+                    <button class="btn btn-danger" onclick="resetForm()">Batal</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentLKPD = null;
+
+        async function loadLKPD() {
+            const id = document.getElementById('lkpd-id').value.trim();
+            const nama = document.getElementById('nama').value.trim();
+            if (!id || !nama) return alert("ID LKPD dan Nama wajib diisi!");
+
+            const res = await fetch(`/api/lkpd/${id}`);
+            if (!res.ok) return alert("LKPD tidak ditemukan!");
+            const lkpd = await res.json();
+            currentLKPD = lkpd;
+            currentLKPD.id = id;
+            currentLKPD.nama = nama;
+
+            // Tampilkan header
+            document.getElementById('judul-lkpd').textContent = lkpd.title;
+            document.getElementById('tema').textContent = lkpd.theme;
+            document.getElementById('tingkat').textContent = lkpd.difficulty;
+
+            // Render soal
+            const form = document.getElementById('jawaban-form');
+            form.innerHTML = '';
+            lkpd.questions.forEach((q, i) => {
+                const div = document.createElement('div');
+                div.className = 'question-card';
+                div.innerHTML = `
+                    <h4>${i+1}. [${q.type}] ${q.question}</h4>
+                    ${q.type === 'PG' ? renderPG(q) : renderEsai(q)}
+                `;
+                form.appendChild(div);
+            });
+
+            document.getElementById('form-section').style.display = 'none';
+            document.getElementById('lkpd-content').style.display = 'block';
+        }
+
+        function renderPG(q) {
+            let html = '';
+            Object.keys(q.options).forEach(key => {
+                html += `
+                    <label class="radio-option">
+                        <input type="radio" name="q${q.id}" value="${key}" required>
+                        <span>${key}. ${q.options[key]}</span>
+                    </label><br>
+                `;
+            });
+            return html;
+        }
+
+        function renderEsai(q) {
+            return `<textarea name="q${q.id}" placeholder="Tulis jawaban esai di sini..." required style="width:100%; height:120px; padding:10px; border:1px solid #ddd; border-radius:6px;"></textarea>`;
+        }
+
+        async function submitJawaban() {
+            if (!confirm("Yakin ingin mengumpulkan jawaban?")) return;
+
+            const form = document.getElementById('jawaban-form');
+            const formData = new FormData(form);
+            const answers = [];
+
+            currentLKPD.questions.forEach(q => {
+                const input = formData.get(`q${q.id}`);
+                answers.push({
+                    id: q.id,
+                    type: q.type,
+                    question: q.question,
+                    jawaban: input || "",
+                    kunci: q.answer,
+                    bobot: q.score
+                });
+            });
+
+            await fetch('/api/submit', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    lkpd_id: currentLKPD.id,
+                    name: currentLKPD.nama,
+                    answers: answers
+                })
+            });
+
+            alert("Jawaban berhasil dikumpul! Terima kasih.");
+            resetForm();
+        }
+
+        function resetForm() {
+            document.getElementById('form-section').style.display = 'block';
+            document.getElementById('lkpd-content').style.display = 'none';
+            document.getElementById('lkpd-id').value = '';
+            document.getElementById('nama').value = '';
+        }
+    </script>
+
+    <style>
+        .question-card { margin: 1.5rem 0; padding: 1rem; background: #f8f9fa; border-radius: 8px; }
+        .radio-option { display: block; margin: 0.5rem 0; cursor: pointer; }
+        .radio-option input { margin-right: 8px; }
+    </style>
+</body>
+</html>
